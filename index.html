@@ -1,0 +1,1733 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saturn Line-of-Sight Planner</title>
+
+<style>
+  :root {
+    --bg: #0b1020;
+    --panel: #121a2d;
+    --panel2: #18233b;
+    --text: #eef3ff;
+    --muted: #aab5cc;
+    --accent: #7dd3fc;
+    --good: #86efac;
+    --bad: #fca5a5;
+    --line: #2a3857;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: linear-gradient(145deg, #080c17, #111a2e);
+    color: var(--text);
+  }
+
+  .wrap {
+    max-width: 1120px;
+    margin: auto;
+    padding: 28px 18px 42px;
+  }
+
+  .hero {
+    margin-bottom: 20px;
+  }
+
+  h1 {
+    font-size: clamp(28px, 5vw, 44px);
+    margin: 0 0 8px;
+    letter-spacing: -1px;
+  }
+
+  .hero p {
+    color: var(--muted);
+    margin: 0;
+    max-width: 800px;
+    line-height: 1.5;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 18px;
+  }
+
+  .card {
+    background: rgba(18, 26, 45, 0.94);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 20px;
+    box-shadow: 0 12px 35px #0004;
+  }
+
+  h2 {
+    font-size: 17px;
+    margin: 0 0 14px;
+  }
+
+  label {
+    display: block;
+    font-size: 13px;
+    color: var(--muted);
+    margin: 12px 0 6px;
+  }
+
+  input {
+    width: 100%;
+    padding: 10px 11px;
+    border-radius: 10px;
+    border: 1px solid #344462;
+    background: #0d1526;
+    color: var(--text);
+    font-size: 15px;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .hint {
+    font-size: 12px;
+    color: #7f8ca8;
+    margin-top: 5px;
+    line-height: 1.45;
+  }
+
+  .result {
+    padding: 16px;
+    border-radius: 14px;
+    background: var(--panel2);
+    margin-bottom: 15px;
+  }
+
+  .status {
+    font-size: 23px;
+    font-weight: 750;
+  }
+
+  .status.good {
+    color: var(--good);
+  }
+
+  .status.bad {
+    color: var(--bad);
+  }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 9px;
+    margin-top: 12px;
+  }
+
+  .metric {
+    background: #0d1526;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    padding: 10px;
+  }
+
+  .metric b {
+    display: block;
+    font-size: 18px;
+  }
+
+  .metric span {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 14px;
+    background: #080d19;
+    border: 1px solid var(--line);
+  }
+
+  .formula {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
+    color: #b9c7df;
+    background: #0d1526;
+    padding: 12px;
+    border-radius: 10px;
+    line-height: 1.6;
+    margin-top: 14px;
+  }
+
+  .note {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+    margin-top: 14px;
+  }
+
+  .footer {
+    font-size: 12px;
+    color: #78859f;
+    margin-top: 18px;
+  }
+
+  @media (max-width: 800px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+
+    .metrics {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <div class="hero">
+    <h1>Saturn Line-of-Sight Planner</h1>
+
+    <p>
+      Check whether a building, hill or other obstacle will block Saturn.
+      Probably not accurate. Results may vary. Always check the label.
+    </p>
+  </div>
+
+
+  <div class="grid">
+
+    <!-- INPUT PANEL -->
+    <section class="card">
+
+      <h2>📐 Obstacle</h2>
+
+      <label>Obstacle distance (m)</label>
+      <input
+        id="distance"
+        type="number"
+        min="0.1"
+        step="0.1"
+        value="100"
+      >
+
+      <div class="row">
+
+        <div>
+          <label>Obstacle height (m)</label>
+          <input
+            id="height"
+            type="number"
+            step="0.1"
+            value="30"
+          >
+        </div>
+
+        <div>
+          <label>Camera height (m)</label>
+          <input
+            id="camera"
+            type="number"
+            step="0.1"
+            value="1.7"
+          >
+        </div>
+
+      </div>
+
+      <label>
+        Ground elevation difference
+        (obstacle − camera, m)
+      </label>
+
+      <input
+        id="ground"
+        type="number"
+        step="0.1"
+        value="0"
+      >
+
+      <div class="hint">
+        Positive means the obstacle is on higher ground than the camera.
+        Negative means it is on lower ground.
+      </div>
+
+
+      <h2 style="margin-top:24px">🪐 Saturn</h2>
+
+      <div class="row">
+
+        <div>
+          <label>Altitude above horizon (°)</label>
+
+          <input
+            id="satAlt"
+            type="number"
+            min="0"
+            max="90"
+            step="0.1"
+            value="20"
+          >
+        </div>
+
+        <div>
+          <label>Azimuth (°)</label>
+
+          <input
+            id="az"
+            type="number"
+            min="0"
+            max="360"
+            step="0.1"
+            value="145"
+          >
+        </div>
+
+      </div>
+
+      <div class="hint">
+        0° = north, 90° = east, 180° = south, 270° = west.
+      </div>
+
+
+      <label>Obstacle bearing / azimuth (°)</label>
+
+      <input
+        id="obsAz"
+        type="number"
+        min="0"
+        max="360"
+        step="0.1"
+        value="145"
+      >
+
+      <div class="hint">
+        Direction from the camera to the obstacle.
+      </div>
+
+
+      <h2 style="margin-top:24px">📷 Camera</h2>
+
+      <label>Horizontal field of view (°)</label>
+
+      <input
+        id="fov"
+        type="number"
+        min="0.1"
+        max="180"
+        step="0.1"
+        value="5"
+      >
+
+      <div class="hint">
+        The obstacle can only block Saturn if its bearing falls within
+        half the horizontal FOV from Saturn's azimuth.
+      </div>
+
+    </section>
+
+
+    <!-- RESULT PANEL -->
+    <section class="card">
+
+      <div id="result" class="result"></div>
+
+      <canvas
+        id="diagram"
+        width="960"
+        height="570"
+      ></canvas>
+
+      <div id="formula" class="formula"></div>
+
+      <div class="note">
+        The vertical diagram uses a real physical coordinate system:
+        horizontal distances and vertical heights are both represented
+        using the same scale. The diagram therefore preserves the actual
+        geometric angle between the camera, obstacle and Saturn line.
+      </div>
+
+    </section>
+
+  </div>
+
+
+  <div class="footer">
+    Enter Saturn's altitude and azimuth for the exact observing time and
+    location from an astronomy application or ephemeris.
+  </div>
+
+</div>
+
+
+<script>
+
+const $ = id => document.getElementById(id);
+
+
+const inputIds = [
+  "distance",
+  "height",
+  "camera",
+  "ground",
+  "satAlt",
+  "az",
+  "obsAz",
+  "fov"
+];
+
+
+inputIds.forEach(id => {
+  $(id).addEventListener("input", update);
+});
+
+
+function numberValue(id) {
+
+  const value = parseFloat($(id).value);
+
+  return Number.isFinite(value) ? value : 0;
+
+}
+
+
+function radians(degrees) {
+  return degrees * Math.PI / 180;
+}
+
+
+function format(value) {
+
+  return Number.isFinite(value)
+    ? value.toFixed(1)
+    : "—";
+
+}
+
+
+/*
+ * Shortest difference between two azimuths.
+ *
+ * 359° and 1° => 2°
+ * 350° and 10° => 20°
+ */
+function angularDifference(a, b) {
+
+  return Math.abs(
+    ((a - b + 540) % 360) - 180
+  );
+
+}
+
+
+/*
+ * Normalise an azimuth to 0..360
+ */
+function normaliseAzimuth(value) {
+
+  return ((value % 360) + 360) % 360;
+
+}
+
+
+/*
+ * =========================================================
+ * MAIN CALCULATION
+ * =========================================================
+ */
+
+function calculate() {
+
+  const distance = Math.max(
+    0.01,
+    numberValue("distance")
+  );
+
+  const obstacleHeight =
+    numberValue("height");
+
+  const cameraHeight =
+    numberValue("camera");
+
+  const groundDifference =
+    numberValue("ground");
+
+  const satAltitude =
+    Math.max(
+      0,
+      Math.min(
+        90,
+        numberValue("satAlt")
+      )
+    );
+
+  const satAzimuth =
+    normaliseAzimuth(
+      numberValue("az")
+    );
+
+  const obstacleAzimuth =
+    normaliseAzimuth(
+      numberValue("obsAz")
+    );
+
+  const fov =
+    Math.max(
+      0.1,
+      Math.min(
+        180,
+        numberValue("fov")
+      )
+    );
+
+
+  /*
+   * IMPORTANT:
+   *
+   * All heights are converted into a coordinate
+   * system whose zero height is the camera.
+   *
+   * Obstacle ground:
+   *
+   *     groundDifference - cameraHeight
+   *
+   * Obstacle top:
+   *
+   *     groundDifference + obstacleHeight - cameraHeight
+   */
+
+  const obstacleGroundRelative =
+    groundDifference - cameraHeight;
+
+
+  const obstacleTopRelative =
+    groundDifference +
+    obstacleHeight -
+    cameraHeight;
+
+
+  /*
+   * Angular elevation of obstacle top.
+   */
+
+  const obstacleAltitude =
+    Math.atan2(
+      obstacleTopRelative,
+      distance
+    ) * 180 / Math.PI;
+
+
+  /*
+   * Difference between Saturn and
+   * the obstacle vertically.
+   */
+
+  const verticalClearance =
+    satAltitude -
+    obstacleAltitude;
+
+
+  /*
+   * Horizontal angular separation.
+   */
+
+  const azimuthSeparation =
+    angularDifference(
+      satAzimuth,
+      obstacleAzimuth
+    );
+
+
+  /*
+   * Is obstacle horizontally inside image?
+   */
+
+  const obstacleInFov =
+    azimuthSeparation <= fov / 2;
+
+
+  /*
+   * Final blocking condition:
+   *
+   * 1. obstacle is inside horizontal FOV
+   * 2. obstacle reaches Saturn's altitude
+   */
+
+  const blocked =
+    obstacleInFov &&
+    obstacleAltitude >= satAltitude;
+
+
+  return {
+
+    distance,
+    obstacleHeight,
+    cameraHeight,
+    groundDifference,
+
+    obstacleGroundRelative,
+    obstacleTopRelative,
+
+    satAltitude,
+    satAzimuth,
+    obstacleAzimuth,
+
+    fov,
+
+    obstacleAltitude,
+    verticalClearance,
+
+    azimuthSeparation,
+
+    obstacleInFov,
+    blocked
+
+  };
+
+}
+
+
+/*
+ * =========================================================
+ * UPDATE RESULT
+ * =========================================================
+ */
+
+function update() {
+
+  const r = calculate();
+
+
+  let explanation;
+
+
+  if (r.blocked) {
+
+    explanation =
+      `The obstacle is ${format(r.azimuthSeparation)}° from Saturn ` +
+      `in azimuth and is inside the ${format(r.fov)}° field of view. ` +
+      `Its top reaches ${format(r.obstacleAltitude)}°, while Saturn ` +
+      `is at ${format(r.satAltitude)}°.`;
+
+  }
+
+  else if (!r.obstacleInFov) {
+
+    explanation =
+      `The obstacle is ${format(r.azimuthSeparation)}° from Saturn ` +
+      `in azimuth, outside the ${format(r.fov)}° field of view. ` +
+      `It therefore cannot block Saturn in this framing.`;
+
+  }
+
+  else {
+
+    explanation =
+      `The obstacle is inside the field of view but reaches only ` +
+      `${format(r.obstacleAltitude)}°. Saturn is at ` +
+      `${format(r.satAltitude)}°, leaving ${format(r.verticalClearance)}° ` +
+      `of vertical clearance.`;
+
+  }
+
+
+  /*
+   * Result panel.
+   */
+
+  document.getElementById("result").innerHTML = `
+
+    <div class="status ${r.blocked ? "bad" : "good"}">
+
+      ${r.blocked
+        ? "⚠ Saturn is blocked"
+        : "✓ Saturn is clear"}
+
+    </div>
+
+    <div style="
+      color:var(--muted);
+      margin-top:5px;
+      line-height:1.5;
+    ">
+
+      ${explanation}
+
+    </div>
+
+
+    <div class="metrics">
+
+      <div class="metric">
+        <b>${format(r.obstacleAltitude)}°</b>
+        <span>obstacle top altitude</span>
+      </div>
+
+      <div class="metric">
+        <b>${format(r.satAltitude)}°</b>
+        <span>Saturn altitude</span>
+      </div>
+
+      <div class="metric">
+        <b>${format(r.verticalClearance)}°</b>
+        <span>vertical clearance</span>
+      </div>
+
+      <div class="metric">
+        <b>${format(r.satAzimuth)}°</b>
+        <span>Saturn azimuth</span>
+      </div>
+
+      <div class="metric">
+        <b>${format(r.obstacleAzimuth)}°</b>
+        <span>obstacle bearing</span>
+      </div>
+
+      <div class="metric">
+        <b>${format(r.azimuthSeparation)}°</b>
+        <span>azimuth separation</span>
+      </div>
+
+    </div>
+
+  `;
+
+
+  /*
+   * Formula panel.
+   */
+
+  document.getElementById("formula").innerHTML =
+
+    `<strong>Vertical geometry</strong><br>` +
+
+    `Obstacle top relative to camera = ` +
+
+    `ground difference + obstacle height − camera height<br>` +
+
+    `= ${format(r.groundDifference)} + ` +
+    `${format(r.obstacleHeight)} − ` +
+    `${format(r.cameraHeight)}` +
+
+    ` = <b>${format(r.obstacleTopRelative)} m</b><br><br>` +
+
+
+    `Obstacle altitude = atan2(` +
+    `${format(r.obstacleTopRelative)}, ` +
+    `${format(r.distance)}` +
+    `) = <b>${format(r.obstacleAltitude)}°</b><br><br>` +
+
+
+    `<strong>Vertical clearance</strong><br>` +
+
+    `Saturn altitude − obstacle altitude = ` +
+
+    `${format(r.satAltitude)} − ` +
+    `${format(r.obstacleAltitude)}` +
+
+    ` = <b>${format(r.verticalClearance)}°</b><br><br>` +
+
+
+    `<strong>Horizontal geometry</strong><br>` +
+
+    `Saturn azimuth = ${format(r.satAzimuth)}°<br>` +
+
+    `Obstacle bearing = ${format(r.obstacleAzimuth)}°<br>` +
+
+    `Angular separation = <b>${format(r.azimuthSeparation)}°</b><br>` +
+
+    `Half FOV = ${format(r.fov / 2)}°<br><br>` +
+
+
+    `<strong>Final result</strong><br>` +
+
+    `Obstacle horizontally in FOV = ` +
+    `<b>${r.obstacleInFov ? "YES" : "NO"}</b><br>` +
+
+    `Obstacle vertically reaches Saturn = ` +
+    `<b>${r.obstacleAltitude >= r.satAltitude ? "YES" : "NO"}</b><br>` +
+
+    `Therefore = <b>${r.blocked ? "BLOCKED" : "CLEAR"}</b>`;
+
+
+  drawDiagram(r);
+
+}
+
+
+/*
+ * =========================================================
+ * VERTICAL DIAGRAM
+ * =========================================================
+ *
+ * This diagram deliberately uses the SAME physical
+ * coordinates as the calculation.
+ *
+ * x = metres horizontally
+ * y = metres vertically
+ *
+ * Therefore the angle shown by the lines is correct.
+ */
+
+function drawDiagram(r) {
+
+  const canvas = document.getElementById("diagram");
+  const ctx = canvas.getContext("2d");
+
+  const W = canvas.width;
+  const H = canvas.height;
+
+  ctx.clearRect(0, 0, W, H);
+
+  /*
+   * =========================================================
+   * BACKGROUND
+   * =========================================================
+   */
+
+  ctx.fillStyle = "#080d19";
+  ctx.fillRect(0, 0, W, H);
+
+
+  /*
+   * =========================================================
+   * PLOT AREA
+   * =========================================================
+   */
+
+  const plotLeft = 55;
+  const plotRight = W - 300;
+  const plotTop = 45;
+  const plotBottom = H - 60;
+
+  const plotWidth = plotRight - plotLeft;
+  const plotHeight = plotBottom - plotTop;
+
+
+  /*
+   * Physical geometry:
+   *
+   * Camera:
+   *     x = 0
+   *     y = 0
+   *
+   * Ground at obstacle:
+   *     y = groundDifference - cameraHeight
+   *
+   * Building top:
+   *     y = groundDifference
+   *         + obstacleHeight
+   *         - cameraHeight
+   */
+
+  const cameraY = 0;
+
+  const groundY =
+    r.groundDifference -
+    r.cameraHeight;
+
+  const buildingTopY =
+    r.groundDifference +
+    r.obstacleHeight -
+    r.cameraHeight;
+
+
+  /*
+   * Horizontal extent.
+   */
+
+  const horizontalRange =
+    Math.max(
+      20,
+      r.distance * 1.12
+    );
+
+
+  /*
+   * Saturn height at the far edge.
+   */
+
+  const saturnHeightAtEdge =
+    Math.tan(
+      radians(r.satAltitude)
+    ) * horizontalRange;
+
+
+  /*
+   * Vertical range.
+   */
+
+  const minPhysicalY =
+    Math.min(
+      groundY,
+      cameraY,
+      0
+    );
+
+  const maxPhysicalY =
+    Math.max(
+      buildingTopY,
+      saturnHeightAtEdge,
+      10
+    );
+
+
+  /*
+   * Padding.
+   */
+
+  const verticalPadding =
+    Math.max(
+      5,
+      (maxPhysicalY - minPhysicalY) * 0.10
+    );
+
+
+  const minY =
+    minPhysicalY -
+    verticalPadding;
+
+  const maxY =
+    maxPhysicalY +
+    verticalPadding;
+
+
+  const physicalHeight =
+    maxY - minY;
+
+
+  /*
+   * IMPORTANT:
+   *
+   * One physical metre uses the SAME
+   * number of pixels horizontally and
+   * vertically.
+   */
+
+  const pixelsPerMetre =
+    Math.min(
+      plotWidth / horizontalRange,
+      plotHeight / physicalHeight
+    );
+
+
+  /*
+   * Coordinate conversion.
+   */
+
+  const originX = plotLeft;
+
+  const cameraScreenY =
+    plotTop +
+    (maxY - cameraY) *
+    pixelsPerMetre;
+
+
+  function X(metres) {
+
+    return (
+      originX +
+      metres * pixelsPerMetre
+    );
+
+  }
+
+
+  function Y(metres) {
+
+    return (
+      plotTop +
+      (maxY - metres) *
+      pixelsPerMetre
+    );
+
+  }
+
+
+  /*
+   * =========================================================
+   * HORIZON LINE
+   * =========================================================
+   *
+   * The horizon is NOT the ground.
+   *
+   * It is the horizontal line through
+   * the camera.
+   */
+
+  ctx.strokeStyle = "#50617e";
+  ctx.lineWidth = 1.5;
+
+  ctx.setLineDash([6, 5]);
+
+  ctx.beginPath();
+
+  ctx.moveTo(
+    plotLeft,
+    Y(cameraY)
+  );
+
+  ctx.lineTo(
+    plotRight,
+    Y(cameraY)
+  );
+
+  ctx.stroke();
+
+  ctx.setLineDash([]);
+
+
+  ctx.fillStyle = "#71809b";
+  ctx.font = "11px system-ui";
+
+  ctx.fillText(
+    "local horizon / camera level (0°)",
+    plotLeft + 5,
+    Y(cameraY) - 8
+  );
+
+
+  /*
+   * =========================================================
+   * GROUND LINE
+   * =========================================================
+   */
+
+  const obstacleGroundScreenY =
+    Y(groundY);
+
+  ctx.strokeStyle = "#394762";
+  ctx.lineWidth = 3;
+
+  ctx.beginPath();
+
+  ctx.moveTo(
+    X(0),
+    Y(groundY)
+  );
+
+  ctx.lineTo(
+    plotRight,
+    Y(groundY)
+  );
+
+  ctx.stroke();
+
+
+  ctx.fillStyle = "#697792";
+
+  ctx.fillText(
+    "ground",
+    plotLeft + 5,
+    obstacleGroundScreenY + 17
+  );
+
+
+  /*
+   * =========================================================
+   * CAMERA
+   * =========================================================
+   */
+
+  const cameraScreenX =
+    X(0);
+
+  ctx.fillStyle = "#7dd3fc";
+
+  ctx.beginPath();
+
+  ctx.arc(
+    cameraScreenX,
+    cameraScreenY,
+    7,
+    0,
+    Math.PI * 2
+  );
+
+  ctx.fill();
+
+
+  ctx.fillStyle = "#aab5cc";
+
+  ctx.font = "12px system-ui";
+
+  ctx.fillText(
+    `camera (${format(r.cameraHeight)} m)`,
+    cameraScreenX - 25,
+    cameraScreenY - 14
+  );
+
+
+  /*
+   * Small vertical camera-height marker.
+   */
+
+  ctx.strokeStyle = "#7dd3fc66";
+  ctx.lineWidth = 1;
+
+  ctx.beginPath();
+
+  ctx.moveTo(
+    cameraScreenX + 18,
+    obstacleGroundScreenY
+  );
+
+  ctx.lineTo(
+    cameraScreenX + 18,
+    cameraScreenY
+  );
+
+  ctx.stroke();
+
+
+  ctx.fillStyle = "#7dd3fc";
+
+  ctx.fillText(
+    `${format(r.cameraHeight)} m`,
+    cameraScreenX + 23,
+    (obstacleGroundScreenY + cameraScreenY) / 2
+  );
+
+
+  /*
+   * =========================================================
+   * BUILDING
+   * =========================================================
+   */
+
+  const buildingHalfWidth =
+    Math.max(
+      2.5,
+      Math.min(
+        r.distance * 0.035,
+        8
+      )
+    );
+
+
+  const buildingLeft =
+    X(
+      r.distance -
+      buildingHalfWidth
+    );
+
+
+  const buildingRight =
+    X(
+      r.distance +
+      buildingHalfWidth
+    );
+
+
+  const buildingTopScreenY =
+    Y(buildingTopY);
+
+
+  /*
+   * Building body.
+   */
+
+  ctx.fillStyle = "#475569";
+
+  ctx.fillRect(
+
+    buildingLeft,
+
+    buildingTopScreenY,
+
+    buildingRight -
+      buildingLeft,
+
+    obstacleGroundScreenY -
+      buildingTopScreenY
+
+  );
+
+
+  /*
+   * Roof.
+   */
+
+  ctx.fillStyle = "#94a3b8";
+
+  ctx.fillRect(
+
+    buildingLeft - 4,
+
+    buildingTopScreenY - 4,
+
+    buildingRight -
+      buildingLeft +
+      8,
+
+    4
+
+  );
+
+
+  /*
+   * Building labels.
+   */
+
+  ctx.fillStyle = "#aab5cc";
+
+  ctx.font = "12px system-ui";
+
+  ctx.fillText(
+    `${format(r.distance)} m`,
+    buildingLeft - 5,
+    obstacleGroundScreenY + 21
+  );
+
+
+  ctx.fillText(
+    `height ${format(r.obstacleHeight)} m`,
+    buildingLeft - 8,
+    buildingTopScreenY - 12
+  );
+
+
+  ctx.fillText(
+    `${format(r.obstacleAltitude)}°`,
+    buildingRight + 10,
+    buildingTopScreenY + 5
+  );
+
+
+  /*
+   * =========================================================
+   * SATURN SIGHT LINE
+   * =========================================================
+   *
+   * y = tan(angle) × x
+   *
+   * This is the exact same geometry used
+   * by the numerical calculation.
+   */
+
+  const saturnEndX =
+    horizontalRange;
+
+  const saturnEndY =
+    Math.tan(
+      radians(r.satAltitude)
+    ) *
+    saturnEndX;
+
+
+  ctx.setLineDash([8, 7]);
+
+  ctx.strokeStyle = "#f8fafc";
+  ctx.lineWidth = 3;
+
+  ctx.beginPath();
+
+  ctx.moveTo(
+    X(0),
+    Y(0)
+  );
+
+  ctx.lineTo(
+    X(saturnEndX),
+    Y(saturnEndY)
+  );
+
+  ctx.stroke();
+
+  ctx.setLineDash([]);
+
+
+  /*
+   * =========================================================
+   * OBSTACLE TOP SIGHT LINE
+   * =========================================================
+   *
+   * This goes from the camera to the actual
+   * physical top of the building.
+   *
+   * Therefore its angle is automatically:
+   *
+   * atan2(
+   *   buildingTopY,
+   *   distance
+   * )
+   *
+   * exactly matching the calculation.
+   */
+
+  ctx.strokeStyle =
+    r.obstacleInFov
+      ? (
+          r.blocked
+            ? "#fca5a5"
+            : "#64748b"
+        )
+      : "#38465f";
+
+  ctx.lineWidth = 2;
+
+  ctx.beginPath();
+
+  ctx.moveTo(
+    X(0),
+    Y(0)
+  );
+
+  ctx.lineTo(
+    X(r.distance),
+    Y(buildingTopY)
+  );
+
+  ctx.stroke();
+
+
+  /*
+   * =========================================================
+   * SATURN
+   * =========================================================
+   */
+
+  const saturnX =
+    X(saturnEndX);
+
+  const saturnY =
+    Y(saturnEndY);
+
+
+  ctx.fillStyle = "#fde68a";
+
+  ctx.beginPath();
+
+  ctx.arc(
+    saturnX,
+    saturnY,
+    13,
+    0,
+    Math.PI * 2
+  );
+
+  ctx.fill();
+
+
+  /*
+   * Rings.
+   */
+
+  ctx.strokeStyle = "#f59e0b";
+  ctx.lineWidth = 3;
+
+  ctx.beginPath();
+
+  ctx.ellipse(
+    saturnX,
+    saturnY,
+    24,
+    8,
+    -0.15,
+    0,
+    Math.PI * 2
+  );
+
+  ctx.stroke();
+
+
+  ctx.fillStyle = "#f8fafc";
+  ctx.font = "bold 14px system-ui";
+
+  ctx.fillText(
+    "Saturn",
+    Math.min(
+      plotRight - 55,
+      saturnX + 18
+    ),
+    saturnY - 15
+  );
+
+
+  /*
+   * Saturn angle label.
+   */
+
+  ctx.fillStyle = "#7dd3fc";
+
+  const labelX =
+    X(horizontalRange * 0.56);
+
+  const labelY =
+    Y(
+      Math.tan(
+        radians(r.satAltitude)
+      ) *
+      horizontalRange *
+      0.56
+    );
+
+  ctx.fillText(
+    `${format(r.satAltitude)}° Saturn`,
+    labelX,
+    labelY - 10
+  );
+
+
+  /*
+   * =========================================================
+   * STATUS
+   * =========================================================
+   */
+
+  ctx.font = "bold 14px system-ui";
+
+  if (r.blocked) {
+
+    ctx.fillStyle = "#fca5a5";
+
+    ctx.fillText(
+      "BLOCKED",
+      plotLeft + 5,
+      plotTop + 12
+    );
+
+  }
+  else {
+
+    ctx.fillStyle = "#86efac";
+
+    ctx.fillText(
+      "CLEAR",
+      plotLeft + 5,
+      plotTop + 12
+    );
+
+  }
+
+
+  /*
+   * =========================================================
+   * AZIMUTH DIAGRAM
+   * =========================================================
+   */
+
+  drawAzimuthDiagram(
+    ctx,
+    r,
+    W - 135,
+    140,
+    70
+  );
+
+
+  /*
+   * =========================================================
+   * FOOTER
+   * =========================================================
+   */
+
+  ctx.fillStyle = "#71809b";
+  ctx.font = "11px system-ui";
+
+  ctx.fillText(
+    "Vertical section uses identical metres-per-pixel scaling in both axes.",
+    plotLeft,
+    H - 18
+  );
+
+}
+/*
+ * =========================================================
+ * AZIMUTH DIAGRAM
+ * =========================================================
+ */
+
+function drawAzimuthDiagram(
+  ctx,
+  r,
+  cx,
+  cy,
+  radius
+) {
+
+  /*
+   * Outer circle.
+   */
+
+  ctx.strokeStyle =
+    "#34415c";
+
+  ctx.lineWidth =
+    1.5;
+
+  ctx.beginPath();
+
+  ctx.arc(
+    cx,
+    cy,
+    radius,
+    0,
+    Math.PI * 2
+  );
+
+  ctx.stroke();
+
+
+  /*
+   * Cardinal directions.
+   */
+
+  ctx.fillStyle =
+    "#71809b";
+
+  ctx.font =
+    "11px system-ui";
+
+  ctx.fillText(
+    "N",
+    cx - 4,
+    cy - radius - 8
+  );
+
+  ctx.fillText(
+    "E",
+    cx + radius + 8,
+    cy + 4
+  );
+
+  ctx.fillText(
+    "S",
+    cx - 4,
+    cy + radius + 15
+  );
+
+  ctx.fillText(
+    "W",
+    cx - radius - 15,
+    cy + 4
+  );
+
+
+  /*
+   * Convert azimuth to x/y.
+   *
+   * 0° = north
+   * 90° = east
+   * 180° = south
+   * 270° = west
+   */
+
+  function point(azimuth, r) {
+
+    return {
+
+      x:
+        cx +
+        r *
+        Math.sin(
+          radians(azimuth)
+        ),
+
+      y:
+        cy -
+        r *
+        Math.cos(
+          radians(azimuth)
+        )
+
+    };
+
+  }
+
+
+  /*
+   * FOV boundaries.
+   */
+
+  const left =
+    point(
+      r.satAzimuth -
+      r.fov / 2,
+      radius
+    );
+
+  const right =
+    point(
+      r.satAzimuth +
+      r.fov / 2,
+      radius
+    );
+
+
+  ctx.strokeStyle =
+    "#7dd3fc55";
+
+  ctx.lineWidth =
+    2;
+
+
+  ctx.beginPath();
+
+  ctx.moveTo(
+    cx,
+    cy
+  );
+
+  ctx.lineTo(
+    left.x,
+    left.y
+  );
+
+  ctx.moveTo(
+    cx,
+    cy
+  );
+
+  ctx.lineTo(
+    right.x,
+    right.y
+  );
+
+  ctx.stroke();
+
+
+  /*
+   * Saturn direction.
+   */
+
+  const sat =
+    point(
+      r.satAzimuth,
+      radius - 8
+    );
+
+
+  ctx.strokeStyle =
+    "#fde68a";
+
+  ctx.lineWidth =
+    3;
+
+
+  ctx.beginPath();
+
+  ctx.moveTo(
+    cx,
+    cy
+  );
+
+  ctx.lineTo(
+    sat.x,
+    sat.y
+  );
+
+  ctx.stroke();
+
+
+  /*
+   * Obstacle direction.
+   */
+
+  const obstacle =
+    point(
+      r.obstacleAzimuth,
+      radius - 8
+    );
+
+
+  ctx.strokeStyle =
+    r.obstacleInFov
+      ? (
+          r.blocked
+            ? "#fca5a5"
+            : "#94a3b8"
+        )
+      : "#475569";
+
+
+  ctx.lineWidth =
+    2;
+
+
+  ctx.beginPath();
+
+  ctx.moveTo(
+    cx,
+    cy
+  );
+
+  ctx.lineTo(
+    obstacle.x,
+    obstacle.y
+  );
+
+  ctx.stroke();
+
+
+  /*
+   * Labels.
+   */
+
+  ctx.fillStyle =
+    "#fde68a";
+
+  ctx.fillText(
+    "Saturn",
+    cx - 18,
+    cy - radius + 28
+  );
+
+
+  ctx.fillStyle =
+    r.obstacleInFov
+      ? (
+          r.blocked
+            ? "#fca5a5"
+            : "#94a3b8"
+        )
+      : "#596985";
+
+  ctx.fillText(
+    "obstacle",
+    cx - 25,
+    cy + radius + 29
+  );
+
+
+  /*
+   * Angular separation.
+   */
+
+  ctx.fillStyle =
+    "#aab5cc";
+
+  ctx.fillText(
+    `Δ ${format(r.azimuthSeparation)}°`,
+    cx - 20,
+    cy + 4
+  );
+
+  ctx.fillText(
+    `FOV ${format(r.fov)}°`,
+    cx - 21,
+    cy + 18
+  );
+
+}
+
+
+/*
+ * Initial render.
+ */
+
+update();
+
+</script>
+
+</body>
+</html>
